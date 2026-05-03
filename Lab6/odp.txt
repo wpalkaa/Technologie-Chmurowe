@@ -1,0 +1,46 @@
+docker rmi wojdeg13/chmury-frontend:v4
+docker rmi wojdeg13/chmury-backend:v4
+
+docker buildx build \
+    --platform linux/amd64,linux/arm64 \
+    --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --build-arg VERSION="1.0.0" \
+    --tag wojdeg13/chmury-frontend:v3 \
+    --push \
+    ./frontend
+
+docker buildx build \
+    --platform linux/amd64,linux/arm64 \
+    --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --build-arg VERSION="1.0.0" \
+    --tag wojdeg13/chmury-backend:v4 \
+    --push \
+    ./backend
+
+================ WINDOWS ==================
+docker buildx build `
+  --platform linux/amd64,linux/arm64 `
+  --build-arg BUILD_DATE="$(Get-Date -UFormat %Y-%m-%dT%H:%M:%SZ)" `
+  --build-arg VERSION="1.0.0" `
+  --tag wojdeg13/chmury-frontend:v4 `
+  --push `
+  ./frontend
+docker pull wojdeg13/chmury-frontend:v4
+
+docker buildx build `
+  --platform linux/amd64,linux/arm64 `
+  --build-arg BUILD_DATE="$(Get-Date -UFormat %Y-%m-%dT%H:%M:%SZ)" `
+  --build-arg VERSION="1.0.0" `
+  --tag wojdeg13/chmury-backend:v4 `
+  --push `
+  ./backend
+docker pull wojdeg13/chmury-backend:v4
+
+============================================
+
+docker run -d --name api-a --network apps-net wojdeg13/chmury-backend:v3 
+docker run -d --name api-b --network apps-net wojdeg13/chmury-backend:v3
+
+
+docker run -d --name frontendv3 --network apps-net -p 80:80 wojdeg13/chmury-frontend:v3
+

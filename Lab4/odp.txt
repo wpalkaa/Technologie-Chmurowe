@@ -1,0 +1,305 @@
+image.png
+server.js:
+const express = require('express');
+const os = require('os');
+// const cors = require('cors')
+
+
+const app = express();
+app.use(express.json());
+// app.use(cors({
+//     origin: ['http://localhost:5173'],
+//     methods: ['POST', 'GET']
+// }));
+
+
+const productList = [ 'apple', 'grass', 'banana' ];
+
+
+app.get('/items', (req, res) => {
+    console.log(`[Info]: GET /items request received.`)
+
+
+    res.status(200).json(productList);
+})
+
+
+app.get('/stats', (req, res) => {
+    console.log(`[Info]: GET /stats request received.`)
+    
+    const productsAmount = productList.length;
+
+
+    res.status(200).json({
+        products: productsAmount,
+        instance: os.hostname(),
+    });
+});
+
+
+/*
+template:
+{
+    "item": "newProduct"
+}
+*/
+
+
+app.post('/items', (req, res) => {
+    console.log(`[Info]: POST /items request received.`)
+    
+    const newProduct = req.body; 
+    productList.push(newProduct.item);
+
+
+    res.status(200).json({
+        message: "item added succesfully",
+        newItemList: productList,
+    });
+})
+
+
+
+
+app.listen(3000, () => {
+    console.log("[Info]: Server started. Listening on 3000.");
+});
+
+
+
+dockerfile - backend:
+image.png
+
+
+app.jsx:
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+
+
+const Home = () => (
+    <h2>Strona Główna</h2>
+)
+
+
+const Products = () => {
+    const [ products, setProducts ] = useState([]);
+    const [ newProduct, setNewProduct ] = useState('');
+    
+    const fetchProductsList = async () => {
+        const response = await fetch("/api/items");
+
+
+        if(response.ok) {
+            const data = await response.json();
+            setProducts(data);
+        }
+    }
+
+
+    useEffect(() => {
+        fetchProductsList();
+    }, [])
+
+
+    const addProduct = (e) => {
+        e.preventDefault();
+
+
+        fetch("/api/items", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item: newProduct })
+        })
+        .then(() => {
+            setNewProduct('');
+            fetchProductsList();
+        });
+    };
+
+
+    return (
+        <div>
+            <h2>Lista Produktów</h2>
+            <ul>
+                {products.map(p => <li key={p}>{p}</li>)}
+            </ul>
+            <form onSubmit={addProduct}>
+                <input 
+                value={newProduct} 
+                onChange={(e) => setNewProduct(e.target.value)} 
+                placeholder="Nazwa nowego produktu" 
+                required 
+                />
+                <button type="submit">Dodaj produkt</button>
+            </form>
+        </div>
+    );
+};
+
+
+
+const Stats = () => {
+    const [stats, setStats] = useState(null);
+
+
+    useEffect(() => {
+        // fetch("http://localhost:3010/stats")
+        // .then(res => res.json())
+        // .then(data => setStats(data));
+
+
+        const fetchStats = async () => {
+            try {
+                const response = await fetch("/api/stats");
+
+
+                if(response.ok) {
+                    const data = await response.json();
+                    console.log(data)
+                    setStats(data);
+                }
+            } catch(error) {
+                console.error("błąd fetch statystyk: ",error);
+            }
+        }
+
+
+        fetchStats();
+    }, []);
+
+
+    return (
+        <div>
+            <h2>📊 Statystyki Systemu</h2>
+            {stats ? (
+                <ul>
+                <li><strong>Produktów:</strong> {stats.products}</li>
+                <li><strong>Obsłużone przez instancję backendu:</strong> {stats.instance}</li>
+                </ul>
+            ) : <p>Ładowanie statystyk...</p>}
+        </div>
+    );
+};
+
+
+
+export default function App() {
+    return (
+        <Router>
+            <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+                <nav style={{ marginBottom: '20px', display: 'flex', gap: '15px' }}>
+                    <Link to="/">Strona Główna</Link>
+                    <Link to="/products">Produkty</Link>
+                    <Link to="/stats">Statystyki</Link>
+                </nav>
+                <hr />
+                <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/products" element={<Products />} />
+                    <Route path="/stats" element={<Stats />} />
+                </Routes>
+            </div>
+        </Router>
+    );
+}
+
+
+
+
+dockerfile - frontend:
+image.png
+
+
+
+nginx.conf:
+
+
+proxy_cache_path /tmp/nginx_cache 
+    levels=1:2 
+    keys_zone=stats_cache:10m 
+    max_size=100m 
+    inactive=60m;
+
+
+server {
+    listen 80;
+
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+
+    location /api/stats {
+        proxy_pass http://backend:3000/stats/;
+        
+        proxy_cache stats_cache;
+        proxy_cache_valid 200 30s;
+        
+        add_header X-Cache-Status $upstream_cache_status;
+    }
+
+
+    location /api/ {
+        proxy_pass http://backend:3000/;
+    }
+}
+
+
+
+
+
+komendy:
+docker build -t wojdeg13/chmury-backend:v1 ./backend
+
+docker tag wojdeg13/chmury-backend:v1 wojdeg13/chmury-backend:latest
+
+docker push wojdeg13/chmury-backend:v1
+
+docker push wojdeg13/chmury-backend:latest
+
+
+
+docker build -t wojdeg13/chmury-frontend:v1 ./strona
+
+docker tag wojdeg13/chmury-frontend:v1 wojdeg13/prochmuryduct-frontend:latest
+
+docker push wojdeg13/chmury-frontend:v1
+
+docker push wojdeg13/chmury-frontend:latest
+
+
+
+docker rmi wojdeg13/chmury-backend:v1
+
+docker rmi wojdeg13/chmury-frontend:v1
+
+
+
+docker pull wojdeg13/chmury-backend:v1
+
+docker pull wojdeg13/chmury-frontend:v1
+
+
+
+
+
+docker network create apps-net
+
+
+
+docker run -d --name backend --network apps-net wojdeg13/chmury-backend:v1 
+
+docker run -d --name frontend --network apps-net -p 8080:80 wojdeg13/chmury-frontend:v1
+
+
+
+
+
+
+image.png
+image.pngimage.png

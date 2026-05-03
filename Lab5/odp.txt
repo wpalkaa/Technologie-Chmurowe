@@ -1,0 +1,80 @@
+
+komendy:
+docker build -t wojdeg13/chmury-backend:v1 ./backend
+
+docker tag wojdeg13/chmury-backend:v1 wojdeg13/chmury-backend:latest
+
+docker push wojdeg13/chmury-backend:v1
+
+docker push wojdeg13/chmury-backend:latest
+
+
+
+docker build -t wojdeg13/chmury-frontend:v1 ./strona
+
+docker tag wojdeg13/chmury-frontend:v1 wojdeg13/prochmuryduct-frontend:latest
+
+docker push wojdeg13/chmury-frontend:v1
+
+docker push wojdeg13/chmury-frontend:latest
+
+
+
+docker rmi wojdeg13/chmury-backend:v1
+
+docker rmi wojdeg13/chmury-frontend:v1
+
+
+
+docker pull wojdeg13/chmury-backend:v1
+
+docker pull wojdeg13/chmury-frontend:v1
+
+
+
+
+
+docker network create apps-net
+
+
+
+docker run -d --name api-a --network apps-net wojdeg13/chmury-backend:v1 
+docker run -d --name api-b --network apps-net wojdeg13/chmury-backend:v1 
+
+
+docker run -d --name frontend --network apps-net -p 80:80 wojdeg13/chmury-frontend:v1
+
+
+docker buildx inspect --bootstrap multiarch
+
+docker buildx build --platform linux/amd64,linux/arm64 -t wojdeg13/chmury-backend:v2 --push ./backend  
+docker buildx build --platform linux/amd64,linux/arm64 -t wojdeg13/chmury-frontend:v2 --push ./strona
+
+
+docker buildx build \
+    --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --build-arg VERSION="1.0.0" \
+    --tag wojdeg13/chmury-frontend:v3 \
+    --push \
+    ./strona
+
+
+docker buildx build \
+    --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --build-arg VERSION="1.0.0" \
+    --tag wojdeg13/chmury-backend:v3 \
+    --push \
+    ./backend
+
+docker rmi wojdeg13/chmury-frontend:v3
+docker rmi wojdeg13/chmury-backend:v3
+
+docker buildx build --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --build-arg VERSION="1.0.0" --tag wojdeg13/chmury-frontend:v3 --push ./strona
+docker buildx build --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --build-arg VERSION="1.0.0" --tag wojdeg13/chmury-backend:v3 --push ./backend
+
+docker run -d --name api-a --network apps-net wojdeg13/chmury-backend:v3 
+docker run -d --name api-b --network apps-net wojdeg13/chmury-backend:v3
+
+
+docker run -d --name frontendv3 --network apps-net -p 80:80 wojdeg13/chmury-frontend:v3
+

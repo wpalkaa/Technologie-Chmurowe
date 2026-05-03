@@ -1,0 +1,9 @@
+docker run -d --name ng --network host nginx:alpine
+docker run --rm --network host alpine wget -qO- http://localhost
+
+# Potrzebny szybki internet, wiele portów
+
+docker run -d --name dok --network none alpine sleep 3600
+docker exec dok ip addr
+
+# Narzędzia do przetwarzania offline wrażliwych danych, które nie mogą wyciec

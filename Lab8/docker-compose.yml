@@ -1,0 +1,156 @@
+services:
+    nginx:
+        # image: nginx:alpine
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        ports:
+            - "80:80"
+        networks:
+            - proxy-net
+        configs:
+            - source: nginx_config
+              target: /etc/nginx/nginx.conf
+        depends_on:
+            backend_1:
+                condition: service_started
+            backend_2:
+                condition: service_started
+    
+    backend_1:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - POSTGRES_DB=${POSTGRES_DB}
+            - REDIS_URL=${REDIS_URL}
+        networks:
+            - proxy-net
+            - app-net
+            - db-net
+        secrets:
+            - db_user
+            - db_password
+        configs:
+            - source: app_config
+              target: /app/app.config.json
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+    
+    backend_2:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        environment:
+            - BACKEND_PORT=${BACKEND_PORT}
+            - POSTGRES_DB=${POSTGRES_DB}
+            - REDIS_URL=${REDIS_URL}
+        networks:
+            - proxy-net
+            - app-net
+            - db-net
+        secrets:
+            - db_user
+            - db_password
+        configs:
+            - source: app_config
+              target: /app/app.config.json
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+    
+    worker:
+        build:
+            context: ./worker
+            dockerfile: Dockerfile
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB}
+            - REDIS_URL=${REDIS_URL}
+        networks:
+            - app-net
+            - db-net
+        secrets:
+            - db_user
+            - db_password
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+    
+    redis:
+        image: redis:alpine
+        networks:
+            - app-net
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+    
+    postgres:
+        image: postgres:16-alpine
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB}
+            - POSTGRES_USER_FILE=/run/secrets/db_user
+            - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+        networks:
+            - db-net
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+        secrets:
+            - db_user
+            - db_password
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $$(cat /run/secrets/db_user) -d ${POSTGRES_DB}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    adminer:
+        image: adminer:latest
+        ports:
+            - "8080:8080"
+        networks:
+            - db-net
+        
+volumes:
+    postgres-data:
+    redis-data:
+
+networks:
+    proxy-net:
+        ipam:
+            config:
+                - subnet: 172.20.0.0/16
+                  gateway: 172.20.0.1
+    app-net:
+        ipam:
+            config:
+                - subnet: 172.21.0.0/16
+                  gateway: 172.21.0.1
+    db-net:
+        ipam:
+            config:
+                - subnet: 172.22.0.0/16
+                  gateway: 172.22.0.1
+
+secrets:
+    db_user:
+        file: ./secrets/db_user.txt
+    db_password:
+        file: ./secrets/db_password.txt
+
+configs:
+    nginx_config:
+        file: ./nginx.conf
+    app_config:
+        file: ./backend/app.config.json
